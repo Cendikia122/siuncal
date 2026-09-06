@@ -1,6 +1,5 @@
 {
-  "outputDirectory": "apps/passenger-mobile",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/apps/passenger-mobile/$1" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
