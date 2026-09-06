@@ -45,3 +45,4 @@ datasets/
 
 # Editor backups
 *.bak
+.vercel
