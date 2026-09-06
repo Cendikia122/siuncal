@@ -117037,7 +117037,7 @@ s($,"blF","a83",()=>new A.ayT(A.cu("[/\\\\]",!0,!1),A.cu("[^/\\\\]$",!0,!1),A.cu
 s($,"blE","Ph",()=>new A.ayj(A.cu("/",!0,!1),A.cu("(^[a-zA-Z][-+.a-zA-Z\\d]*://|[^/])$",!0,!1),A.cu("[a-zA-Z][-+.a-zA-Z\\d]*://[^/]*",!0,!1),A.cu("^/",!0,!1)))
 s($,"blC","aTk",()=>A.bbl())
 s($,"bkZ","a82",()=>A.aVp())
-s($,"bjf","b1m",()=>{var q,p=(typeof window!=="undefined"&&window.SIUNCAL_API_URL&&window.SIUNCAL_API_URL!=="http://localhost:4000")?window.SIUNCAL_API_URL:"https://conducive-angelic-saturate.ngrok-free.dev",o=A.aYO(p)
+s($,"bjf","b1m",()=>{var q,p=(typeof window!=="undefined"&&window.SIUNCAL_API_URL&&window.SIUNCAL_API_URL!=="http://localhost:4000")?window.SIUNCAL_API_URL:"https://pantry-deputy-ammonia.ngrok-free.dev",o=A.aYO(p)
 if(o==null||!o.gO8()||B.c.ga6(o.gn5()))A.U(A.ad("API_BASE_URL tidak valid. Gunakan URL API lengkap."))
 return B.c.aGN(p,A.cu("/+$",!0,!1),"")})
 s($,"bof","Pk",()=>A.tY(new A.aNu(),t.uN))
