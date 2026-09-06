@@ -1,0 +1,12 @@
+appId: id.sentra.passenger
+---
+- stopApp
+- launchApp:
+    clearState: true
+- assertVisible: ".*SENTRA.*"
+- tapOn: ".*Trayek.*Info.*"
+- assertVisible: ".*Angkot Trayek Info.*"
+- assertVisible: ".*5 trayek beroperasi.*"
+- assertVisible: ".*01.*"
+- assertVisible: ".*02.*"
+- assertVisible: ".*03.*"

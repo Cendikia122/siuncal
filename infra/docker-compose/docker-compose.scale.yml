@@ -1,0 +1,15 @@
+# Scale-out override for proxy/LB mode.
+#
+# Usage:
+#   docker compose --env-file infra/docker-compose/.env \
+#     -f infra/docker-compose/docker-compose.yml \
+#     -f infra/docker-compose/docker-compose.scale.yml \
+#     --profile proxy up -d --scale api-gateway=2
+#
+# The base compose file publishes api-gateway on a fixed localhost port for
+# simple local development. Fixed host ports prevent multiple replicas, so proxy
+# mode removes that direct host mapping and routes traffic through Caddy.
+
+services:
+  api-gateway:
+    ports: !reset []

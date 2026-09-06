@@ -1,0 +1,15 @@
+{
+  "name": "telemetry-simulator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "simulate": "node simulator.js",
+    "simulate:quick": "INTERVAL_MS=5000 node simulator.js",
+    "simulate:passenger": "node passenger-simulator.js",
+    "simulate:passenger:quick": "PASSENGER_INTERVAL_MS=5000 node passenger-simulator.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}

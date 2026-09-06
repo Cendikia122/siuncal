@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Rules Engine Unit Tests",
+      "trigger": "PostFileSave",
+      "description": "Runs the rules-engine test suite (node --test) whenever a JS source file in services/rules-engine changes, to catch regressions in overspeed / off-route / idle (ngetem) detection.",
+      "matcher": "services/rules-engine/.*\\.(js|mjs|cjs)$",
+      "action": {
+        "type": "command",
+        "command": "cd services/rules-engine && npm test",
+        "timeout": 120
+      }
+    }
+  ]
+}

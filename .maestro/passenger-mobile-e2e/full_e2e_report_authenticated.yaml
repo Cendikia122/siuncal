@@ -1,0 +1,30 @@
+appId: id.sentra.passenger
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    text: ".*Saya setuju dan lanjutkan.*"
+    optional: true
+- waitForAnimationToEnd
+- assertVisible: ".*(Beranda|Buat Laporan|Lapor).*"
+
+# Submit a public report from an authenticated mobile session.
+- tapOn:
+    point: "50%,94%"
+- assertVisible: ".*Buat Laporan.*"
+- tapOn: ".*Silahkan pilih apa yang mau dilaporkan.*"
+- tapOn:
+    point: "35%,30%"
+- tapOn: ".*Contoh: F 1234 BO.*"
+- inputText: "F 1901 AK"
+- tapOn: ".*Ceritakan kejadian secara singkat dan jelas.*"
+- inputText: "Automated E2E report ngetem dari Maestro simulator."
+- tapOn:
+    point: "50%,12%"
+- scrollUntilVisible:
+    element:
+      text: ".*Aktifkan Lokasi.*"
+    direction: DOWN
+- tapOn: ".*Aktifkan Lokasi.*"
+- assertVisible: ".*Lokasi Aktif.*"
+- tapOn: ".*Pilih Foto.*"

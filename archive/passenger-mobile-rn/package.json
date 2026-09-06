@@ -1,0 +1,35 @@
+{
+  "name": "@sentra/passenger-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "prebuild": "expo prebuild",
+    "build:ios": "expo run:ios"
+  },
+  "dependencies": {
+    "@lineiconshq/free-icons": "^1.0.6",
+    "@lineiconshq/react-native-lineicons": "^0.0.3",
+    "expo": "~55.0.23",
+    "expo-image-picker": "~55.0.20",
+    "expo-location": "~55.1.9",
+    "expo-status-bar": "~55.0.6",
+    "expo-task-manager": "~55.0.0",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-maps": "^1.27.2",
+    "react-native-svg": "15.15.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.6",
+    "eslint": "^9.39.2",
+    "eslint-config-expo": "~55.0.0",
+    "typescript": "~5.9.3"
+  }
+}

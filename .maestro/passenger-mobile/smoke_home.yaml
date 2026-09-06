@@ -1,0 +1,11 @@
+appId: id.sentra.passenger
+---
+- stopApp
+- launchApp:
+    clearState: true
+- assertVisible: ".*SENTRA.*"
+- assertVisible: ".*Angkot Bogor.*"
+- assertVisible: ".*Beranda.*"
+- assertVisible: ".*Lapor.*"
+- assertVisible: ".*Profil.*"
+- assertVisible: ".*Pantau Angkot.*"

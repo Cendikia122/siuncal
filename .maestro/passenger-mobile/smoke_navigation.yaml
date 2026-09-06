@@ -1,0 +1,15 @@
+appId: id.sentra.passenger
+---
+- stopApp
+- launchApp:
+    clearState: true
+- assertVisible: ".*Beranda.*"
+- tapOn:
+    point: "83%,94%"
+- assertVisible: ".*Profil.*"
+- tapOn:
+    point: "50%,94%"
+- assertVisible: ".*(Buat Laporan|Masuk untuk membuat laporan|Kirim untuk review Dishub).*"
+- tapOn:
+    point: "17%,94%"
+- assertVisible: ".*Halo, mau naik angkot.*"

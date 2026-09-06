@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "API Contract Sync Reminder",
+      "trigger": "PostFileSave",
+      "description": "On api-gateway source changes, injects a prompt to review Flutter (Dio) and Next.js (React Query) client code that consumes the changed contract. No auto codegen pipeline exists.",
+      "matcher": "services/api-gateway/src/.*\\.(js|mjs|cjs)$",
+      "action": {
+        "type": "agent",
+        "prompt": "An api-gateway source file was just changed. If this change modifies an HTTP route, request/response shape, WebSocket message structure, or a zod validation schema, identify the client-side code that consumes it and would break: the Flutter passenger app (apps/passenger-mobile, Dio HTTP calls and model classes) and the Next.js operator web app (apps/operator-web, React Query hooks and TypeScript types in src/lib, src/hooks, src/types). List the specific client files and fields that must be updated to stay in sync. Note: this repo has no OpenAPI/ts-rest/openapi-generator pipeline, so updates are manual. Do not edit files unless asked."
+      }
+    }
+  ]
+}

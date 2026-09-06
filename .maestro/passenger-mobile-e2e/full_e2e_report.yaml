@@ -1,0 +1,55 @@
+appId: id.sentra.passenger
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    text: ".*Keluar dari akun.*"
+    optional: true
+- assertVisible: ".*Beranda.*"
+
+# Start from a known logged-out state when an old secure-storage session exists.
+- tapOn:
+    point: "83%,94%"
+- scrollUntilVisible:
+    element:
+      text: ".*Keluar.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*Keluar.*"
+    optional: true
+- assertVisible: ".*(Belum masuk|Profil).*"
+
+# Login through the report gate using a non-production seed account.
+- tapOn:
+    point: "50%,94%"
+- tapOn: "^Masuk$"
+- assertVisible: ".*Kata sandi.*"
+- tapOn: ".*Kata sandi.*"
+- inputText: "__PASSENGER_PASSWORD__"
+- hideKeyboard
+- tapOn:
+    text: "^Masuk$"
+    optional: true
+- waitForAnimationToEnd
+
+# First login should require explicit passenger tracking consent.
+- assertVisible: ".*(Persetujuan Lokasi|Buat Laporan|Beranda).*"
+- tapOn:
+    text: ".*Saya setuju dan lanjutkan.*"
+    optional: true
+- assertVisible: ".*(Beranda|Buat Laporan|Lapor).*"
+
+# Submit a public report from the mobile UI.
+- tapOn:
+    point: "50%,94%"
+- assertVisible: ".*Buat Laporan.*"
+- tapOn: ".*Silahkan pilih apa yang mau dilaporkan.*"
+- tapOn: ".*Ngetem.*"
+- tapOn: ".*Contoh: F 1234 BO.*"
+- inputText: "F 1901 AK"
+- tapOn: ".*Ceritakan kejadian secara singkat dan jelas.*"
+- inputText: "Automated E2E report ngetem dari Maestro simulator."
+- tapOn: ".*Aktifkan Lokasi.*"
+- assertVisible: ".*Lokasi Aktif.*"
+- tapOn: ".*Pilih Foto.*"

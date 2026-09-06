@@ -1,0 +1,223 @@
+name: CI
+
+on:
+  push:
+    branches: [main, production]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  readiness-assessment:
+    name: Readiness assessment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Test readiness assessment
+        run: node --test scripts/readiness-assessment.test.mjs
+
+      - name: Render readiness assessment
+        run: node scripts/readiness-assessment.mjs --json
+
+  service-unit-tests:
+    name: Service tests (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - services/api-gateway
+          - services/rules-engine
+          - services/notification-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.service }}
+        run: npm ci
+
+      - name: Run tests
+        working-directory: ${{ matrix.service }}
+        run: npm test
+
+  operator-web-quality:
+    name: Operator web lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/operator-web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/operator-web
+        run: npm ci
+
+      - name: Lint
+        working-directory: apps/operator-web
+        run: npm run lint
+
+      - name: Build
+        working-directory: apps/operator-web
+        run: npm run build
+
+  passenger-mobile-test:
+    name: Passenger mobile tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        working-directory: apps/passenger-mobile
+        run: flutter pub get
+
+      - name: Run tests
+        working-directory: apps/passenger-mobile
+        run: flutter test
+
+  api-live-integration:
+    name: API live integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: services/api-gateway/package-lock.json
+
+      - name: Install API test dependencies
+        working-directory: services/api-gateway
+        run: npm ci
+
+      - name: Validate Docker Compose config
+        run: docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml config --quiet
+
+      - name: Start production-critical services
+        run: |
+          docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml up -d --build \
+            postgres redis minio api-gateway worker rules-engine notification-service
+
+      - name: Wait for API readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:4000/ready; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml ps
+          docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml logs api-gateway redis minio postgres
+          exit 1
+
+      - name: Run API live tests
+        working-directory: services/api-gateway
+        env:
+          SMOKE_BASE_URL: http://localhost:4000
+        run: npm test
+
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml logs
+
+      - name: Stop stack
+        if: always()
+        run: docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml down -v
+
+  operator-web-e2e:
+    name: Operator web E2E
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs:
+      - operator-web-quality
+      - api-live-integration
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/operator-web/package-lock.json
+
+      - name: Install operator web dependencies
+        working-directory: apps/operator-web
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: apps/operator-web
+        run: npx playwright install --with-deps chromium
+
+      - name: Start full stack
+        run: |
+          docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml up -d --build \
+            postgres redis minio api-gateway worker rules-engine notification-service operator-web
+
+      - name: Wait for stack readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:4000/ready && curl -fsS http://localhost:3000/auth/login >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml ps
+          docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml logs api-gateway operator-web
+          exit 1
+
+      - name: Run E2E smoke
+        working-directory: apps/operator-web
+        env:
+          E2E_BASE_URL: http://localhost:3000
+        run: npm run test:e2e
+
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml logs
+
+      - name: Stop stack
+        if: always()
+        run: docker compose --env-file infra/docker-compose/.env.example -f infra/docker-compose/docker-compose.yml down -v

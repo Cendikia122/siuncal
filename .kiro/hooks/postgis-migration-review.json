@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "PostGIS Migration Review",
+      "trigger": "PostFileSave",
+      "description": "On spatial migration changes, injects a review prompt to check affected PostGIS queries and validation in the JS backend services (no TS codegen exists in this repo).",
+      "matcher": "db/migrations/.*\\.sql$",
+      "action": {
+        "type": "agent",
+        "prompt": "A SQL migration under db/migrations/ was just changed. If it alters a spatial table (PostGIS geometry/geography columns such as route coordinates or geofencing points), review the downstream impact in the JavaScript services (services/api-gateway and services/rules-engine): check every SQL query that SELECTs or filters on the changed columns (ST_ functions, geometry casts, SRID assumptions), confirm column names and types still match, and flag any query, DTO, or validation (zod) that must be updated. These services are plain JavaScript, so there are no generated TypeScript types to sync. List concrete files and queries that need attention. Do not edit files unless asked."
+      }
+    }
+  ]
+}

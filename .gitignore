@@ -1,0 +1,47 @@
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Node
+node_modules/
+# Duplicates / renamed folders (e.g. macOS Duplicate → "node_modules 08.47.30") — not matched by node_modules/
+**/node_modules */
+.next/
+dist/
+build/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/build/
+
+# Android / iOS
+**/Pods/
+**/*.xcuserdata/
+**/*.xcworkspace/
+**/DerivedData/
+**/.gradle/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Local ML datasets and trained artifacts
+datasets/
+
+# Claude Code
+.claude/settings.local.json
+.claude/worktrees/
+
+# Editor backups
+*.bak

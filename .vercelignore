@@ -1,0 +1,11 @@
+# Deploy Vercel hanya untuk operator web.
+# Mobile Flutter, backend, database, dan infra tidak perlu ikut di-upload/build.
+apps/passenger-mobile/
+archive/
+services/
+db/
+infra/
+.maestro/
+.pi/
+dataset/
+datasets/

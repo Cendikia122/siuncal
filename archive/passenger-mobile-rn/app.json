@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Sentra Angkot",
+    "slug": "sentra-passenger-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "sentra",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "id.sentra.passenger",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Sentra memakai lokasi Anda hanya saat mengirim laporan agar Dishub bisa memeriksa posisi kejadian.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Sentra memakai lokasi background untuk mengirim posisi passenger aktif ke dashboard operator Dishub.",
+        "UIBackgroundModes": [
+          "location"
+        ],
+        "NSCameraUsageDescription": "Sentra membutuhkan kamera untuk mengambil foto bukti laporan.",
+        "NSPhotoLibraryUsageDescription": "Sentra membutuhkan akses foto agar Anda bisa memilih bukti laporan."
+      }
+    },
+    "android": {
+      "package": "id.sentra.passenger",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Sentra memakai lokasi background untuk mengirim posisi passenger aktif ke dashboard operator Dishub.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Sentra membutuhkan akses foto agar Anda bisa memilih bukti laporan.",
+          "cameraPermission": "Sentra membutuhkan kamera untuk mengambil foto bukti laporan.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrl": "http://localhost:4000"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Operator Web Map Lint",
+      "trigger": "PostFileSave",
+      "description": "Runs ESLint on operator-web when a map or heatmap component changes, to guard bundle/render quality for Leaflet clustering and heatmap views.",
+      "matcher": "apps/operator-web/src/components/(map|heatmap)/.*\\.(ts|tsx)$",
+      "action": {
+        "type": "command",
+        "command": "cd apps/operator-web && npm run lint",
+        "timeout": 120
+      }
+    }
+  ]
+}

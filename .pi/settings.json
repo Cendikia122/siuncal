@@ -1,0 +1,12 @@
+{
+  "defaultModel": "gpt-5.5",
+  "defaultProvider": "openai-codex",
+  "defaultThinkingLevel": "high",
+  "lastChangelogVersion": "0.78.0",
+  "packages": [
+    "npm:pi-btw",
+    "npm:pi-powerline",
+    "npm:@juanibiapina/pi-powerbar"
+  ],
+  "powerline": false
+}

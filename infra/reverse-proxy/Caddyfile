@@ -1,0 +1,26 @@
+# Sentra reverse proxy (Caddy) — terminates TLS for the dashboard and API.
+#
+# Production: set SENTRA_DOMAIN / SENTRA_API_DOMAIN to real public domains and
+# Caddy obtains Let's Encrypt certs automatically (ports 80+443 must be reachable).
+# Local test: defaults below use *.localhost, for which Caddy issues an internal
+# (self-signed) cert automatically — trust Caddy's local CA to test in a browser.
+#
+# Two hostnames keep paths intact (API routes live at root: /auth/login, /realtime, ...).
+
+{
+	# email {$ACME_EMAIL}   # uncomment in production for Let's Encrypt notifications
+}
+
+# --- Operator dashboard (Next.js) ---
+{$SENTRA_DOMAIN:localhost} {
+	encode gzip zstd
+	# Caddy auto-uses internal TLS for *.localhost; real domains get Let's Encrypt.
+	reverse_proxy operator-web:3000
+}
+
+# --- API gateway (REST + WebSocket /realtime) ---
+{$SENTRA_API_DOMAIN:api.localhost} {
+	encode gzip zstd
+	# reverse_proxy forwards X-Forwarded-For/Proto by default; api-gateway trusts 1 hop.
+	reverse_proxy api-gateway:4000
+}

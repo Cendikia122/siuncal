@@ -1,0 +1,411 @@
+name: monitoring-angkot
+
+services:
+  # =============================================================================
+  # Data Layer
+  # =============================================================================
+  
+  postgres:
+    image: timescale/timescaledb-ha:pg13-latest
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+    # --- MED-10: Only expose DB port for local dev. Remove in production. ---
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+      - ../../db:/db:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - monitoring-network
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.2-p0
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      DB_NAME: ${POSTGRES_DB:?POSTGRES_DB is required}
+      LISTEN_PORT: 6432
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-500}
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE:-50}
+      MIN_POOL_SIZE: ${PGBOUNCER_MIN_POOL_SIZE:-10}
+      RESERVE_POOL_SIZE: ${PGBOUNCER_RESERVE_POOL_SIZE:-10}
+      SERVER_RESET_QUERY: DISCARD ALL
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+      ADMIN_USERS: ${POSTGRES_USER:?POSTGRES_USER is required}
+    ports:
+      - "127.0.0.1:${PGBOUNCER_PORT:-6432}:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=\"$$DB_PASSWORD\" pg_isready -h 127.0.0.1 -p $${LISTEN_PORT:-6432} -U $$DB_USER -d $$DB_NAME"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - monitoring-network
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # --- HIGH-08: Redis with authentication ---
+    command: >
+      sh -c 'redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 256mb --maxmemory-policy noeviction'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    # --- MED-10: Redis is bound to localhost only; use SSH tunnel/VPN for admin access. ---
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - monitoring-network
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - monitoring-network
+
+  # =============================================================================
+  # Backend Services
+  # =============================================================================
+
+  api-gateway:
+    build:
+      context: ../../services/api-gateway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${API_GATEWAY_PORT:-4000}:4000"
+    environment: &api-gateway-env
+      PORT: 4000
+      # Workers run in the dedicated `worker` service; keep them out of the API path.
+      RUN_WORKERS: ${RUN_WORKERS:-false}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-15m}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-14}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-Lax}
+      PUBLIC_TRACKING_RATE_LIMIT_WINDOW_MS: ${PUBLIC_TRACKING_RATE_LIMIT_WINDOW_MS:-60000}
+      PUBLIC_TRACKING_RATE_LIMIT_MAX: ${PUBLIC_TRACKING_RATE_LIMIT_MAX:-600}
+      PUBLIC_VEHICLES_CACHE_TTL_SEC: ${PUBLIC_VEHICLES_CACHE_TTL_SEC:-3}
+      PUBLIC_VEHICLES_CDN_CACHE_TTL_SEC: ${PUBLIC_VEHICLES_CDN_CACHE_TTL_SEC:-5}
+      DEVICE_OFFLINE_MINUTES: ${DEVICE_OFFLINE_MINUTES:-10}
+      DEVICE_TAMPER_IMPOSSIBLE_SPEED_KMH: ${DEVICE_TAMPER_IMPOSSIBLE_SPEED_KMH:-140}
+      DEVICE_TAMPER_IDENTITY_MISMATCH_THRESHOLD: ${DEVICE_TAMPER_IDENTITY_MISMATCH_THRESHOLD:-3}
+      SLA_ACK_MINUTES: ${SLA_ACK_MINUTES:-5}
+      SLA_RESOLVE_MINUTES: ${SLA_RESOLVE_MINUTES:-30}
+      PLAYBACK_MAX_RANGE_HOURS: ${PLAYBACK_MAX_RANGE_HOURS:-24}
+      PLAYBACK_MAX_POINTS: ${PLAYBACK_MAX_POINTS:-5000}
+      MAP_MATCHING_PROVIDER: ${MAP_MATCHING_PROVIDER:-local_postgis}
+      MAP_MATCHING_MAX_SNAP_DISTANCE_METERS: ${MAP_MATCHING_MAX_SNAP_DISTANCE_METERS:-80}
+      MAP_MATCHING_MIN_CONFIDENCE: ${MAP_MATCHING_MIN_CONFIDENCE:-0.35}
+      TELEMETRY_TARGET_INTERVAL_SEC: ${TELEMETRY_TARGET_INTERVAL_SEC:-5}
+      TELEMETRY_QUALITY_DRIFT_THRESHOLD_M: ${TELEMETRY_QUALITY_DRIFT_THRESHOLD_M:-80}
+      TELEMETRY_QUALITY_SLA_TARGET_PCT: ${TELEMETRY_QUALITY_SLA_TARGET_PCT:-99.5}
+      TELEMETRY_INGEST_TOKEN: ${TELEMETRY_INGEST_TOKEN:-}
+      TELEMETRY_HMAC_SECRET: ${TELEMETRY_HMAC_SECRET:-}
+      REALTIME_PUBSUB_ENABLED: ${REALTIME_PUBSUB_ENABLED:-true}
+      REALTIME_BROADCAST_CHANNEL: ${REALTIME_BROADCAST_CHANNEL:-realtime:broadcast}
+      REALTIME_BROADCAST_LOCK_KEY: ${REALTIME_BROADCAST_LOCK_KEY:-realtime:broadcast:leader}
+      REALTIME_BROADCAST_LOCK_TTL_MS: ${REALTIME_BROADCAST_LOCK_TTL_MS:-2750}
+      REDIS_HEALTH_URL: tcp://redis:6379
+      RULES_ENGINE_HEALTH_URL: http://rules-engine:4100/health
+      NOTIFICATION_SERVICE_HEALTH_URL: http://notification-service:4101/health
+      SERVICE_HEALTH_TIMEOUT_MS: ${SERVICE_HEALTH_TIMEOUT_MS:-1500}
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      PLAYBACK_RECORD_BUCKET: ${PLAYBACK_RECORD_BUCKET:-playback-records}
+      PUBLIC_REPORT_BUCKET: ${PUBLIC_REPORT_BUCKET:-public-report-evidence}
+      PUBLIC_REPORT_MAX_ATTACHMENT_MB: ${PUBLIC_REPORT_MAX_ATTACHMENT_MB:-5}
+      PUBLIC_REPORT_MAX_ATTACHMENTS: ${PUBLIC_REPORT_MAX_ATTACHMENTS:-3}
+      PUBLIC_REPORT_RATE_LIMIT_WINDOW_MS: ${PUBLIC_REPORT_RATE_LIMIT_WINDOW_MS:-600000}
+      PUBLIC_REPORT_RATE_LIMIT_MAX: ${PUBLIC_REPORT_RATE_LIMIT_MAX:-5}
+      PUBLIC_REPORT_REVIEW_ENABLED: ${PUBLIC_REPORT_REVIEW_ENABLED:-true}
+      PUBLIC_REPORT_REVIEW_INTERVAL_MS: ${PUBLIC_REPORT_REVIEW_INTERVAL_MS:-300000}
+      PUBLIC_REPORT_REVIEW_BATCH_SIZE: ${PUBLIC_REPORT_REVIEW_BATCH_SIZE:-25}
+      PUBLIC_REPORT_REVIEW_CONCURRENCY: ${PUBLIC_REPORT_REVIEW_CONCURRENCY:-3}
+      PUBLIC_REPORT_EVIDENCE_PROCESSING_ENABLED: ${PUBLIC_REPORT_EVIDENCE_PROCESSING_ENABLED:-true}
+      PUBLIC_REPORT_EVIDENCE_CONCURRENCY: ${PUBLIC_REPORT_EVIDENCE_CONCURRENCY:-2}
+      PUBLIC_REPORT_EVIDENCE_THUMBNAIL_MAX_WIDTH: ${PUBLIC_REPORT_EVIDENCE_THUMBNAIL_MAX_WIDTH:-480}
+      PUBLIC_REPORT_EVIDENCE_THUMBNAIL_MAX_HEIGHT: ${PUBLIC_REPORT_EVIDENCE_THUMBNAIL_MAX_HEIGHT:-480}
+      PUBLIC_REPORT_EVIDENCE_THUMBNAIL_QUALITY: ${PUBLIC_REPORT_EVIDENCE_THUMBNAIL_QUALITY:-80}
+      PUBLIC_REPORT_REVIEW_WINDOW_MINUTES: ${PUBLIC_REPORT_REVIEW_WINDOW_MINUTES:-15}
+      PUBLIC_REPORT_REVIEW_RECENT_MINUTES: ${PUBLIC_REPORT_REVIEW_RECENT_MINUTES:-30}
+      PUBLIC_REPORT_REVIEW_MAX_DISTANCE_METERS: ${PUBLIC_REPORT_REVIEW_MAX_DISTANCE_METERS:-250}
+      PUBLIC_REPORT_REVIEW_STALE_VEHICLE_MINUTES: ${PUBLIC_REPORT_REVIEW_STALE_VEHICLE_MINUTES:-20}
+      PUBLIC_REPORT_REVIEW_NGETEM_LOW_SPEED_KMH: ${PUBLIC_REPORT_REVIEW_NGETEM_LOW_SPEED_KMH:-3}
+      PUBLIC_REPORT_REVIEW_NGETEM_MIN_STOP_MINUTES: ${PUBLIC_REPORT_REVIEW_NGETEM_MIN_STOP_MINUTES:-10}
+      PUBLIC_REPORT_REVIEW_OVERSPEED_KMH: ${PUBLIC_REPORT_REVIEW_OVERSPEED_KMH:-60}
+      PUBLIC_REPORT_REVIEW_OFFICIAL_STOP_RADIUS_METERS: ${PUBLIC_REPORT_REVIEW_OFFICIAL_STOP_RADIUS_METERS:-75}
+      PASSENGER_TRACKING_TOKEN_TTL_DAYS: ${PASSENGER_TRACKING_TOKEN_TTL_DAYS:-30}
+      PASSENGER_LOCATION_MASK_OPERATOR_IDENTITY: ${PASSENGER_LOCATION_MASK_OPERATOR_IDENTITY:-true}
+      PASSENGER_LOCATION_REQUIRE_SCOPE_FOR_OPERATOR: ${PASSENGER_LOCATION_REQUIRE_SCOPE_FOR_OPERATOR:-false}
+      MOBILE_REFRESH_TOKEN_TTL_DAYS: ${MOBILE_REFRESH_TOKEN_TTL_DAYS:-30}
+      MOBILE_VERIFICATION_TTL_MINUTES: ${MOBILE_VERIFICATION_TTL_MINUTES:-60}
+      MOBILE_RESET_TTL_MINUTES: ${MOBILE_RESET_TTL_MINUTES:-30}
+      DB_HOST: ${DB_HOST:-pgbouncer}
+      DB_PORT: ${DB_PORT:-6432}
+      PGBOUNCER_HOST: ${PGBOUNCER_HOST:-pgbouncer}
+      PGBOUNCER_PORT: ${PGBOUNCER_PORT:-6432}
+      DB_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      DB_NAME: ${POSTGRES_DB:?POSTGRES_DB is required}
+      DB_POOL_MAX: ${DB_POOL_MAX:-50}
+      DB_SSL: ${DB_SSL:-false}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/ready"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    networks:
+      - monitoring-network
+
+  # WS3: dedicated BullMQ worker (public-report review + heatmap generation).
+  # Same image/env as api-gateway, but runs src/worker.js instead of the HTTP server.
+  worker:
+    build:
+      context: ../../services/api-gateway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["node", "src/worker.js"]
+    environment:
+      <<: *api-gateway-env
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4102/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - monitoring-network
+
+  notification-service:
+    build:
+      context: ../../services/notification-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: ${DB_HOST:-pgbouncer}
+      DB_PORT: ${DB_PORT:-6432}
+      PGBOUNCER_HOST: ${PGBOUNCER_HOST:-pgbouncer}
+      PGBOUNCER_PORT: ${PGBOUNCER_PORT:-6432}
+      DB_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      DB_NAME: ${POSTGRES_DB:?POSTGRES_DB is required}
+      DB_POOL_MAX: ${NOTIFICATION_DB_POOL_MAX:-10}
+      DB_SSL: ${DB_SSL:-false}
+      HEALTH_PORT: 4101
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-Sentra Angkot <no-reply@sentra.local>}
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4101/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    networks:
+      - monitoring-network
+
+  rules-engine:
+    build:
+      context: ../../services/rules-engine
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: ${DB_HOST:-pgbouncer}
+      DB_PORT: ${DB_PORT:-6432}
+      PGBOUNCER_HOST: ${PGBOUNCER_HOST:-pgbouncer}
+      PGBOUNCER_PORT: ${PGBOUNCER_PORT:-6432}
+      DB_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      DB_NAME: ${POSTGRES_DB:?POSTGRES_DB is required}
+      DB_POOL_MAX: ${RULES_DB_POOL_MAX:-10}
+      DB_SSL: ${DB_SSL:-false}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      HEALTH_PORT: 4100
+      RULE_BATCH_SIZE: ${RULE_BATCH_SIZE:-100}
+      RULE_EVALUATION_CONCURRENCY: ${RULE_EVALUATION_CONCURRENCY:-1}
+      OFF_ROUTE_METERS: ${OFF_ROUTE_METERS:-0}
+      OFF_ROUTE_GRACE_MINUTES: ${OFF_ROUTE_GRACE_MINUTES:-3}
+      OFF_ROUTE_MIN_POINTS: ${OFF_ROUTE_MIN_POINTS:-3}
+      MAP_MATCHING_MIN_CONFIDENCE: ${MAP_MATCHING_MIN_CONFIDENCE:-0.35}
+      WRONG_DIRECTION_GRACE_MINUTES: ${WRONG_DIRECTION_GRACE_MINUTES:-3}
+      WRONG_DIRECTION_MIN_POINTS: ${WRONG_DIRECTION_MIN_POINTS:-3}
+      WRONG_DIRECTION_HEADING_DIFF_DEGREES: ${WRONG_DIRECTION_HEADING_DIFF_DEGREES:-120}
+      WRONG_DIRECTION_MIN_SPEED_KMH: ${WRONG_DIRECTION_MIN_SPEED_KMH:-5}
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4100/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    networks:
+      - monitoring-network
+
+  vehicle-simulator:
+    profiles:
+      - simulator
+    build:
+      context: ../../services/telemetry-ingestion
+      dockerfile: Dockerfile
+    command: npm run simulate:quick
+    environment:
+      API_URL: http://api-gateway:4000
+      INTERVAL_MS: ${SIMULATOR_INTERVAL_MS:-5000}
+      TELEMETRY_INGEST_TOKEN: ${TELEMETRY_INGEST_TOKEN:-}
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - monitoring-network
+
+  passenger-location-simulator:
+    profiles:
+      - simulator
+    build:
+      context: ../../services/telemetry-ingestion
+      dockerfile: Dockerfile
+    command: npm run simulate:passenger:quick
+    environment:
+      API_URL: http://api-gateway:4000
+      PASSENGER_INTERVAL_MS: ${PASSENGER_INTERVAL_MS:-5000}
+      PASSENGER_MOVE_FACTOR: ${PASSENGER_MOVE_FACTOR:-0.25}
+      PASSENGER_SEED_PASSWORD: ${PASSENGER_SEED_PASSWORD:-password123}
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - monitoring-network
+
+  # =============================================================================
+  # Frontend Applications
+  # =============================================================================
+
+  operator-web:
+    build:
+      context: ../../apps/operator-web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000}
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:4000/realtime}
+        NEXT_PUBLIC_MOCK_MODE: ${NEXT_PUBLIC_MOCK_MODE:-false}
+    restart: unless-stopped
+    ports:
+      - "${OPERATOR_WEB_PORT:-3000}:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:4000/realtime}
+      NEXT_PUBLIC_MOCK_MODE: ${NEXT_PUBLIC_MOCK_MODE:-false}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - monitoring-network
+
+  # WS6: TLS reverse proxy. Opt-in via `--profile proxy` so the plain-HTTP demo is
+  # unaffected. Production: set SENTRA_DOMAIN/SENTRA_API_DOMAIN to real domains for
+  # automatic Let's Encrypt. See infra/reverse-proxy/Caddyfile + security-hardening runbook.
+  caddy:
+    image: caddy:2-alpine
+    profiles: [proxy]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SENTRA_DOMAIN: ${SENTRA_DOMAIN:-localhost}
+      SENTRA_API_DOMAIN: ${SENTRA_API_DOMAIN:-api.localhost}
+    volumes:
+      - ../reverse-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - operator-web
+      - api-gateway
+    networks:
+      - monitoring-network
+
+networks:
+  monitoring-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  caddy_data:
+  caddy_config:

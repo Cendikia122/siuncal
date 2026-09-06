@@ -1,0 +1,27 @@
+{
+  "name": "api-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "report:daily": "node src/jobs/generate-reports.js",
+    "report:today": "REPORT_DATE=$(TZ=Asia/Jakarta date +%F) node src/jobs/generate-reports.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1033.0",
+    "bullmq": "^5.76.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "file-type": "^21.3.4",
+    "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "pg": "^8.11.5",
+    "sharp": "^0.34.5",
+    "ws": "^8.17.0",
+    "zod": "^4.4.3"
+  }
+}
