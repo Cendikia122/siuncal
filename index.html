@@ -54,5 +54,315 @@
     window.SIUNCAL_API_URL = isLocalhost ? "http://localhost:4000" : window.__SIUNCAL_PUBLIC_URL__;
   </script>
   <script src="flutter_bootstrap.js" async></script>
+
+  <!-- ========================================================
+       ABSENSI PENGUNJUNG STAND — SI UNCAL (Sementara 2 hari)
+       Aktif s/d: 10 September 2026
+  ======================================================== -->
+  <style>
+    #absensi-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #absensi-overlay.show {
+      display: flex;
+      animation: fadeIn 0.25s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    #absensi-card {
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 28px 24px 24px;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+      animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      position: relative;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    #absensi-skip-btn {
+      position: absolute;
+      top: 12px; right: 14px;
+      background: none; border: none;
+      color: #9ca3af; font-size: 20px;
+      cursor: pointer; line-height: 1;
+      padding: 4px 6px; border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    #absensi-skip-btn:hover { color: #374151; background: #f3f4f6; }
+    #absensi-badge {
+      display: inline-block;
+      background: #dcfce7; color: #15803d;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 99px;
+      margin-bottom: 12px;
+    }
+    #absensi-card h2 {
+      margin: 0 0 6px; font-size: 20px; font-weight: 800;
+      color: #111827; line-height: 1.3;
+    }
+    #absensi-card p {
+      margin: 0 0 20px; font-size: 13px; color: #6b7280; line-height: 1.5;
+    }
+    #absensi-card label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: #374151; margin-bottom: 6px;
+    }
+    #absensi-nama {
+      width: 100%; box-sizing: border-box;
+      padding: 10px 13px; border: 1.5px solid #e5e7eb;
+      border-radius: 10px; font-size: 14px; color: #111827;
+      outline: none; transition: border-color 0.15s;
+      margin-bottom: 18px;
+    }
+    #absensi-nama:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
+    #absensi-stars {
+      display: flex; gap: 8px; margin-bottom: 22px;
+    }
+    .absensi-star {
+      font-size: 28px; cursor: pointer; line-height: 1;
+      transition: transform 0.12s;
+      filter: grayscale(1);
+      opacity: 0.35;
+      user-select: none;
+    }
+    .absensi-star:hover, .absensi-star.active {
+      filter: grayscale(0);
+      opacity: 1;
+    }
+    .absensi-star:hover { transform: scale(1.2); }
+    #absensi-rating-label {
+      font-size: 12px; color: #6b7280; margin-bottom: 6px;
+    }
+    #absensi-rating-desc {
+      font-size: 11px; color: #10b981; min-height: 16px;
+      margin-bottom: 20px; font-weight: 600;
+    }
+    #absensi-submit {
+      width: 100%; padding: 13px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff; font-size: 15px; font-weight: 700;
+      border: none; border-radius: 12px; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      letter-spacing: 0.01em;
+    }
+    #absensi-submit:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    #absensi-submit:active:not(:disabled) { transform: translateY(0); }
+    #absensi-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+    #absensi-success {
+      display: none; text-align: center; padding: 8px 0 4px;
+    }
+    #absensi-success .emoji { font-size: 48px; margin-bottom: 12px; }
+    #absensi-success h3 {
+      margin: 0 0 8px; font-size: 18px; font-weight: 800; color: #111827;
+    }
+    #absensi-success p {
+      margin: 0; font-size: 13px; color: #6b7280;
+    }
+    #absensi-counter {
+      text-align: center; margin-top: 16px;
+      font-size: 12px; color: #9ca3af;
+    }
+    #absensi-counter strong { color: #10b981; }
+  </style>
+
+  <div id="absensi-overlay" role="dialog" aria-modal="true" aria-labelledby="absensi-title">
+    <div id="absensi-card">
+      <button id="absensi-skip-btn" aria-label="Lewati" title="Lewati">✕</button>
+
+      <!-- Form absensi -->
+      <div id="absensi-form-view">
+        <div id="absensi-badge">🎪 Stand SI UNCAL</div>
+        <h2 id="absensi-title">Halo! Selamat datang 👋</h2>
+        <p>Terima kasih sudah mengunjungi stand kami. Yuk, tinggalkan jejak kunjunganmu!</p>
+
+        <label for="absensi-nama">Nama / Instansi <span style="color:#9ca3af;font-weight:400">(opsional)</span></label>
+        <input
+          id="absensi-nama"
+          type="text"
+          placeholder="cth. Budi dari Dishub Bogor"
+          maxlength="80"
+          autocomplete="off"
+        />
+
+        <label id="absensi-rating-label">Rating kunjungan kamu ⭐</label>
+        <div id="absensi-stars" role="radiogroup" aria-label="Rating">
+          <span class="absensi-star" data-val="1" role="radio" aria-label="1 bintang" tabindex="0">⭐</span>
+          <span class="absensi-star" data-val="2" role="radio" aria-label="2 bintang" tabindex="0">⭐</span>
+          <span class="absensi-star" data-val="3" role="radio" aria-label="3 bintang" tabindex="0">⭐</span>
+          <span class="absensi-star" data-val="4" role="radio" aria-label="4 bintang" tabindex="0">⭐</span>
+          <span class="absensi-star" data-val="5" role="radio" aria-label="5 bintang" tabindex="0">⭐</span>
+        </div>
+        <div id="absensi-rating-desc">— Pilih rating di atas —</div>
+
+        <button id="absensi-submit" disabled>Saya Sudah Mengunjungi ✓</button>
+
+        <div id="absensi-counter"></div>
+      </div>
+
+      <!-- Pesan sukses -->
+      <div id="absensi-success">
+        <div class="emoji">🎉</div>
+        <h3>Terima kasih!</h3>
+        <p>Kunjunganmu sudah tercatat.<br>Semoga SI UNCAL bermanfaat untuk Kota Bogor!</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // ── Konfigurasi ──────────────────────────────────────────
+      // Ganti URL ini setelah deploy Google Apps Script
+      var APPS_SCRIPT_URL = "https://script.google.com/a/macros/smkwikrama.sch.id/s/AKfycbz1a26LPxDbGVkaWXMENIKA6y7l8UTuN6xj9s0_npRAXnOVicUKaRGHuRX1JjxVvjC2/exec";
+
+      // Tanggal kedaluwarsa widget (format: YYYY-MM-DD, jam 23:59 WIB)
+      var EXPIRED_DATE = new Date("2026-09-10T23:59:00+07:00");
+      // ──────────────────────────────────────────────────────────
+
+      var LS_KEY = "siuncal_absensi_done";
+      var selectedRating = 0;
+      var overlay  = document.getElementById("absensi-overlay");
+      var submitBtn = document.getElementById("absensi-submit");
+      var ratingDesc = document.getElementById("absensi-rating-desc");
+      var counterEl = document.getElementById("absensi-counter");
+
+      var ratingLabels = ["", "Kurang 😕", "Cukup 🙂", "Bagus 👍", "Keren 🤩", "Luar Biasa! 🔥"];
+
+      // Jangan tampilkan jika sudah pernah submit atau sudah lewat tanggal
+      function shouldShow() {
+        if (new Date() > EXPIRED_DATE) return false;
+        if (localStorage.getItem(LS_KEY)) return false;
+        return true;
+      }
+
+      if (!shouldShow()) return;
+
+      // Tampilkan setelah 1.5 detik
+      setTimeout(function () {
+        overlay.classList.add("show");
+        fetchCounter();
+      }, 1500);
+
+      // Ambil jumlah pengunjung (opsional, gagal diam-diam)
+      function fetchCounter() {
+        if (APPS_SCRIPT_URL.startsWith("GANTI")) return;
+        fetch(APPS_SCRIPT_URL + "?action=count")
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if (d && d.count > 0) {
+              counterEl.innerHTML = "Sudah <strong>" + d.count + "</strong> orang yang mengunjungi stand kami";
+            }
+          })
+          .catch(function(){});
+      }
+
+      // Tutup overlay
+      function closeOverlay() {
+        overlay.classList.remove("show");
+      }
+
+      document.getElementById("absensi-skip-btn").addEventListener("click", closeOverlay);
+      overlay.addEventListener("click", function(e){
+        if (e.target === overlay) closeOverlay();
+      });
+
+      // Rating bintang
+      var stars = document.querySelectorAll(".absensi-star");
+      stars.forEach(function(star) {
+        function setRating(val) {
+          selectedRating = val;
+          stars.forEach(function(s, i) {
+            s.classList.toggle("active", i < val);
+          });
+          ratingDesc.textContent = ratingLabels[val];
+          submitBtn.disabled = false;
+        }
+
+        star.addEventListener("click", function() {
+          setRating(parseInt(star.getAttribute("data-val")));
+        });
+        star.addEventListener("mouseover", function() {
+          var val = parseInt(star.getAttribute("data-val"));
+          stars.forEach(function(s, i) {
+            s.classList.toggle("active", i < val);
+          });
+          ratingDesc.textContent = ratingLabels[val];
+        });
+        star.addEventListener("mouseleave", function() {
+          stars.forEach(function(s, i) {
+            s.classList.toggle("active", i < selectedRating);
+          });
+          ratingDesc.textContent = selectedRating ? ratingLabels[selectedRating] : "— Pilih rating di atas —";
+        });
+        star.addEventListener("keydown", function(e) {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setRating(parseInt(star.getAttribute("data-val")));
+          }
+        });
+      });
+
+      // Submit
+      submitBtn.addEventListener("click", function() {
+        if (!selectedRating) return;
+
+        var nama = document.getElementById("absensi-nama").value.trim() || "-";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Mengirim...";
+
+        var payload = {
+          nama: nama,
+          rating: selectedRating,
+          userAgent: navigator.userAgent.substring(0, 120),
+          timestamp: new Date().toISOString()
+        };
+
+        function onSuccess() {
+          localStorage.setItem(LS_KEY, "1");
+          document.getElementById("absensi-form-view").style.display = "none";
+          document.getElementById("absensi-success").style.display = "block";
+          setTimeout(closeOverlay, 3000);
+        }
+
+        function onError() {
+          // Tetap catat di localStorage supaya tidak spam
+          localStorage.setItem(LS_KEY, "1");
+          onSuccess(); // tampilkan sukses meski gagal kirim
+        }
+
+        if (APPS_SCRIPT_URL.startsWith("GANTI")) {
+          // Mode demo — tidak ada endpoint nyata
+          console.log("[Absensi] Payload (demo mode):", payload);
+          setTimeout(onSuccess, 600);
+          return;
+        }
+
+        fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" }, // Apps Script butuh text/plain utk no-cors
+          body: JSON.stringify(payload)
+        })
+        .then(onSuccess)
+        .catch(onError);
+      });
+    })();
+  </script>
+  <!-- ====== END ABSENSI ====== -->
 </body>
 </html>
