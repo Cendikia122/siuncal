@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  output: process.env.BUILD_STANDALONE === 'true' ? 'standalone' : undefined,
   turbopack: {
     root: process.cwd()
   },
