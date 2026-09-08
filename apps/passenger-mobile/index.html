@@ -306,6 +306,9 @@
           localStorage.setItem(LS_KEY, "1");
           document.getElementById("rating-form-view").style.display = "none";
           document.getElementById("rating-success").style.display = "block";
+          setTimeout(function() {
+            window.location.href = "https://passenger-mobile.vercel.app/";
+          }, 1200);
         }
 
         fetch(APPS_SCRIPT_URL, {
