@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 const APPS_SCRIPT_URL =
-  "https://script.google.com/a/macros/smkwikrama.sch.id/s/AKfycbz1a26LPxDbGVkaWXMENIKA6y7l8UTuN6xj9s0_npRAXnOVicUKaRGHuRX1JjxVvjC2/exec";
+  "https://script.google.com/macros/s/AKfycbwFKwBB4Txk8czWJKpE0wQ8CxtYXWT_LqaawhNn2qB-_DoT9tpOstFIls740a9Grj58/exec";
 const EXPIRED_DATE = new Date("2026-09-10T23:59:00+07:00");
 const LS_KEY = "siuncal_absensi_done";
 
