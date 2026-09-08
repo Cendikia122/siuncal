@@ -54,5 +54,267 @@
     window.SIUNCAL_API_URL = isLocalhost ? "http://localhost:4000" : window.__SIUNCAL_PUBLIC_URL__;
   </script>
   <script src="flutter_bootstrap.js" async></script>
+
+  <!-- ========================================================
+       POP-UP RATING APLIKASI — PASSENGER MOBILE (SI UNCAL)
+       Link Stand: https://cendikia122.github.io/siuncal/
+  ======================================================== -->
+  <style>
+    #rating-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #rating-overlay.show {
+      display: flex;
+      animation: ratingFadeIn 0.25s ease;
+    }
+    @keyframes ratingFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    #rating-card {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 28px 24px 24px;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+      animation: ratingSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      position: relative;
+    }
+    @keyframes ratingSlideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    #rating-skip-btn {
+      position: absolute;
+      top: 14px; right: 16px;
+      background: none; border: none;
+      color: #9ca3af; font-size: 20px;
+      cursor: pointer; line-height: 1;
+      padding: 4px 6px; border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    #rating-skip-btn:hover { color: #374151; background: #f3f4f6; }
+    #rating-badge {
+      display: inline-block;
+      background: #dcfce7; color: #15803d;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 4px 12px; border-radius: 99px;
+      margin-bottom: 12px;
+    }
+    #rating-card h2 {
+      margin: 0 0 6px; font-size: 20px; font-weight: 800;
+      color: #111827; line-height: 1.3;
+    }
+    #rating-card p {
+      margin: 0 0 20px; font-size: 13px; color: #6b7280; line-height: 1.5;
+    }
+    #rating-card label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: #374151; margin-bottom: 6px;
+    }
+    #rating-nama {
+      width: 100%; box-sizing: border-box;
+      padding: 11px 14px; border: 1.5px solid #e5e7eb;
+      border-radius: 12px; font-size: 14px; color: #111827;
+      outline: none; transition: border-color 0.15s;
+      margin-bottom: 18px;
+    }
+    #rating-nama:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
+    #rating-stars {
+      display: flex; gap: 8px; margin-bottom: 10px;
+    }
+    .rating-star {
+      font-size: 30px; cursor: pointer; line-height: 1;
+      transition: transform 0.12s;
+      filter: grayscale(1);
+      opacity: 0.35;
+      user-select: none;
+    }
+    .rating-star:hover, .rating-star.active {
+      filter: grayscale(0);
+      opacity: 1;
+    }
+    .rating-star:hover { transform: scale(1.2); }
+    #rating-desc {
+      font-size: 12px; color: #10b981; min-height: 18px;
+      margin-bottom: 20px; font-weight: 600;
+    }
+    #rating-submit {
+      width: 100%; padding: 13px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff; font-size: 15px; font-weight: 700;
+      border: none; border-radius: 12px; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      letter-spacing: 0.01em; margin-bottom: 10px;
+    }
+    #rating-submit:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    #rating-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+    #rating-link-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 11px; box-sizing: border-box;
+      background: #f3f4f6; color: #374151; font-size: 13px; font-weight: 600;
+      border: 1px solid #e5e7eb; border-radius: 12px; text-decoration: none;
+      transition: background 0.15s;
+    }
+    #rating-link-btn:hover { background: #e5e7eb; color: #111827; }
+    #rating-success {
+      display: none; text-align: center; padding: 12px 0 6px;
+    }
+    #rating-success .emoji { font-size: 48px; margin-bottom: 12px; }
+    #rating-success h3 {
+      margin: 0 0 8px; font-size: 18px; font-weight: 800; color: #111827;
+    }
+    #rating-success p {
+      margin: 0 0 16px; font-size: 13px; color: #6b7280; line-height: 1.5;
+    }
+  </style>
+
+  <div id="rating-overlay" role="dialog" aria-modal="true" aria-labelledby="rating-title">
+    <div id="rating-card">
+      <button id="rating-skip-btn" aria-label="Lewati" title="Lewati">✕</button>
+
+      <!-- View Form -->
+      <div id="rating-form-view">
+        <div id="rating-badge">⭐ Rating Aplikasi</div>
+        <h2 id="rating-title">Suka Aplikasi SI UNCAL?</h2>
+        <p>Bantu kami memberikan layanan terbaik dengan memberikan rating & masukkan Anda!</p>
+
+        <label for="rating-nama">Nama / Instansi <span style="color:#9ca3af;font-weight:400">(opsional)</span></label>
+        <input
+          id="rating-nama"
+          type="text"
+          placeholder="cth. Pengunjung Stand"
+          maxlength="80"
+          autocomplete="off"
+        />
+
+        <label>Berapa rating untuk aplikasi ini?</label>
+        <div id="rating-stars" role="radiogroup" aria-label="Rating Aplikasi">
+          <span class="rating-star" data-val="1" role="radio" aria-label="1 bintang" tabindex="0">⭐</span>
+          <span class="rating-star" data-val="2" role="radio" aria-label="2 bintang" tabindex="0">⭐</span>
+          <span class="rating-star" data-val="3" role="radio" aria-label="3 bintang" tabindex="0">⭐</span>
+          <span class="rating-star" data-val="4" role="radio" aria-label="4 bintang" tabindex="0">⭐</span>
+          <span class="rating-star" data-val="5" role="radio" aria-label="5 bintang" tabindex="0">⭐</span>
+        </div>
+        <div id="rating-desc">— Pilih rating di atas —</div>
+
+        <button id="rating-submit" disabled>Kirim Rating ✓</button>
+
+        <a id="rating-link-btn" href="https://cendikia122.github.io/siuncal/" target="_blank" rel="noopener">
+          🌐 Kunjungi Website Stand Pameran
+        </a>
+      </div>
+
+      <!-- View Sukses -->
+      <div id="rating-success">
+        <div class="emoji">🎉</div>
+        <h3>Terima Kasih!</h3>
+        <p>Rating Anda sangat berharga bagi pengembangan aplikasi SI UNCAL.</p>
+        <a id="rating-link-btn" href="https://cendikia122.github.io/siuncal/" target="_blank" rel="noopener" style="background:#10b981;color:#fff;border:none;">
+          🌐 Buka Web Pameran (GitHub Pages) →
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFKwBB4Txk8czWJKpE0wQ8CxtYXWT_LqaawhNn2qB-_DoT9tpOstFIls740a9Grj58/exec";
+      var LS_KEY = "siuncal_app_rating_done";
+      var STAND_URL = "https://cendikia122.github.io/siuncal/";
+      var selectedRating = 0;
+      var overlay = document.getElementById("rating-overlay");
+      var submitBtn = document.getElementById("rating-submit");
+      var ratingDesc = document.getElementById("rating-desc");
+
+      var ratingLabels = ["", "Kurang 😕", "Cukup 🙂", "Bagus 👍", "Keren 🤩", "Luar Biasa! 🔥"];
+
+      if (localStorage.getItem(LS_KEY)) return;
+
+      setTimeout(function () {
+        overlay.classList.add("show");
+      }, 1500);
+
+      function closeOverlay() {
+        overlay.classList.remove("show");
+      }
+
+      document.getElementById("rating-skip-btn").addEventListener("click", closeOverlay);
+      overlay.addEventListener("click", function(e){
+        if (e.target === overlay) closeOverlay();
+      });
+
+      var stars = document.querySelectorAll(".rating-star");
+      stars.forEach(function(star) {
+        function setRating(val) {
+          selectedRating = val;
+          stars.forEach(function(s, i) {
+            s.classList.toggle("active", i < val);
+          });
+          ratingDesc.textContent = ratingLabels[val];
+          submitBtn.disabled = false;
+        }
+
+        star.addEventListener("click", function() {
+          setRating(parseInt(star.getAttribute("data-val")));
+        });
+        star.addEventListener("mouseover", function() {
+          var val = parseInt(star.getAttribute("data-val"));
+          stars.forEach(function(s, i) {
+            s.classList.toggle("active", i < val);
+          });
+          ratingDesc.textContent = ratingLabels[val];
+        });
+        star.addEventListener("mouseleave", function() {
+          stars.forEach(function(s, i) {
+            s.classList.toggle("active", i < selectedRating);
+          });
+          ratingDesc.textContent = selectedRating ? ratingLabels[selectedRating] : "— Pilih rating di atas —";
+        });
+      });
+
+      submitBtn.addEventListener("click", function() {
+        if (!selectedRating) return;
+
+        var nama = document.getElementById("rating-nama").value.trim() || "-";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Mengirim...";
+
+        var payload = {
+          nama: nama + " (via Passenger Mobile App)",
+          rating: selectedRating,
+          userAgent: navigator.userAgent.substring(0, 120),
+          timestamp: new Date().toISOString()
+        };
+
+        function onSuccess() {
+          localStorage.setItem(LS_KEY, "1");
+          document.getElementById("rating-form-view").style.display = "none";
+          document.getElementById("rating-success").style.display = "block";
+        }
+
+        fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify(payload)
+        })
+        .then(onSuccess)
+        .catch(onSuccess);
+      });
+    })();
+  </script>
+  <!-- ====== END RATING ====== -->
 </body>
 </html>
